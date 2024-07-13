@@ -62,7 +62,7 @@ static int ts_9896_fod_position[4] = {435, 641, 1679, 1868}; //CFG(47)
 static int *fod_position = NULL;
 static int LastATR = 0;
 static int LastATL = 0;
-static int SampleRateLocked = 1;
+static int SampleRateLocked = 0;
 static int FPArea = 6;
 static bool aod_press = false;
 static int key_i = -1;
@@ -111,6 +111,7 @@ extern void enable_aod_processing(bool en);
 extern bool get_aod_processing(void);
 extern int asus_display_global_hbm_mode(void);
 extern void asus_display_report_fod_touched(void);
+extern void notify_fod_pressed(void);
 // ASUS_BSP --- Touch
 /**
  * __do_register_ext_module - register external module
@@ -2390,13 +2391,14 @@ static void goodix_resume_work(struct work_struct *work)
 	} else {
 		ts_info("resume ... ");
 	}
+
 	mutex_lock(&gts_core_data->gts_suspend_mutex);
 	goodix_ts_resume(gts_core_data);
-	goodix_ts_switch_sample_rate(gts_core_data);
-	goodix_ts_rotation(gts_core_data, gts_core_data->rotation);
-
 	mutex_unlock(&gts_core_data->gts_suspend_mutex);
-	
+
+	goodix_ts_rotation(gts_core_data, gts_core_data->rotation);
+	goodix_ts_switch_sample_rate(gts_core_data);
+
 	process_resume = false;
 	ts_info("resume_work ---");
 }
@@ -2941,6 +2943,7 @@ static void goodix_ts_report_finger(struct input_dev *dev,
 						ts_info("KEY_F X = %d, Y = %d", data_x, data_y);
 						input_switch_key(dev, KEY_F);
 						asus_display_report_fod_touched();
+						notify_fod_pressed();
 						ts_info("KEY_F");
 						aod_press = true;
 					} else {
@@ -2981,6 +2984,7 @@ static void goodix_ts_report_finger(struct input_dev *dev,
 						ts_info("KEY_F X = %d, Y = %d", data_x, data_y);
 						input_switch_key(dev, KEY_F);
 						asus_display_report_fod_touched();
+						notify_fod_pressed();
 						ts_info("KEY_F");
 						aod_press = true;
 					} else {
@@ -3937,24 +3941,24 @@ static void goodix_ts_lateresume(struct early_suspend *h)
 }
 #endif
 
-#ifdef CONFIG_PM
-#if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)
+/*#ifdef CONFIG_PM
+#if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)*/
 /**
  * goodix_ts_pm_suspend - PM suspend function
  * Called by kernel during system suspend phrase
  */
-static int goodix_ts_pm_suspend(struct device *dev)
+/*static int goodix_ts_pm_suspend(struct device *dev)
 {
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 	ts_info("goodix_ts_pm_suspend");
 	return goodix_ts_suspend(core_data);
-}
+}*/
 /**
  * goodix_ts_pm_resume - PM resume function
  * Called by kernel during system wakeup
  */
-static int goodix_ts_pm_resume(struct device *dev)
+/*static int goodix_ts_pm_resume(struct device *dev)
 {
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
@@ -3962,7 +3966,7 @@ static int goodix_ts_pm_resume(struct device *dev)
 	return goodix_ts_resume(core_data);
 }
 #endif
-#endif
+#endif*/
 
 /**
  * goodix_generic_noti_callback - generic notifier callback
@@ -4205,14 +4209,14 @@ static int goodix_ts_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_PM
+/*#ifdef CONFIG_PM
 static const struct dev_pm_ops dev_pm_ops = {
 #if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)
 	.suspend = goodix_ts_pm_suspend,
 	.resume = goodix_ts_pm_resume,
 #endif
 };
-#endif
+#endif*/
 
 static const struct platform_device_id ts_core_ids[] = {
 	{.name = GOODIX_CORE_DRIVER_NAME},
@@ -4224,9 +4228,9 @@ static struct platform_driver goodix_ts_driver = {
 	.driver = {
 		.name = GOODIX_CORE_DRIVER_NAME,
 		.owner = THIS_MODULE,
-#ifdef CONFIG_PM
+/*#ifdef CONFIG_PM
 		.pm = &dev_pm_ops,
-#endif
+#endif*/
 	},
 	.probe = goodix_ts_probe,
 	.remove = goodix_ts_remove,
