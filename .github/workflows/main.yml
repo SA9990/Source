@@ -1,0 +1,144 @@
+name: Kernel Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt update && sudo apt upgrade -y
+
+          sudo apt install -y \
+            git \
+            ccache \
+            automake \
+            flex \
+            lzop \
+            bison \
+            gperf \
+            build-essential \
+            zip \
+            curl \
+            zlib1g-dev \
+            g++-multilib \
+            libxml2-utils \
+            bzip2 \
+            libbz2-dev \
+            squashfs-tools \
+            pngcrush \
+            schedtool \
+            dpkg-dev \
+            liblz4-tool \
+            make \
+            optipng \
+            maven \
+            libssl-dev \
+            pwgen \
+            libswitch-perl \
+            policycoreutils \
+            minicom \
+            libxml-sax-base-perl \
+            libxml-simple-perl \
+            bc \
+            libc6-dev-i386 \
+            libx11-dev \
+            libgl1-mesa-dev \
+            xsltproc \
+            unzip \
+            device-tree-compiler \
+            python3 \
+            aria2 \
+            zstd \
+            libncurses-dev \
+            libncurses5-dev:i386 \
+            libzstd-dev
+
+      - name: Download Clang Toolchain
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/toolchains/clang
+
+          aria2c -x16 -s16 -k1M https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
+
+          mkdir -p $GITHUB_WORKSPACE/toolchains/clang/clang
+
+          tar -xzf clang-r547379.tar.gz -C $GITHUB_WORKSPACE/toolchains/clang/clang
+
+      - name: Configure and Build Kernel
+        run: |
+          export PATH=$GITHUB_WORKSPACE/toolchains/clang/clang/bin:$PATH
+
+          export KBUILD_BUILD_USER=drogon
+          export KBUILD_BUILD_HOST=ubuntu
+
+          make distclean
+
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=$GITHUB_WORKSPACE/toolchains/clang/clang/bin/aarch64-linux-android- \
+            AR=llvm-ar \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            NM=llvm-nm \
+            LLVM_DIS=llvm-dis \
+            OBJCOPY=llvm-objcopy \
+            READELF=llvm-readelf \
+            OBJDUMP=llvm-objdump \
+            OBJSIZE=llvm-size \
+            STRIP=llvm-strip \
+            LLVM=1 \
+            LD=ld.lld \
+            LLVM_IAS=1 \
+            vendor/obiwan_defconfig
+
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=$GITHUB_WORKSPACE/toolchains/clang/clang/bin/aarch64-linux-android- \
+            AR=llvm-ar \
+            HOSTCC=clang \
+            HOSTCXX=clang++ \
+            NM=llvm-nm \
+            LLVM_DIS=llvm-dis \
+            OBJCOPY=llvm-objcopy \
+            READELF=llvm-readelf \
+            OBJDUMP=llvm-objdump \
+            OBJSIZE=llvm-size \
+            STRIP=llvm-strip \
+            LLVM=1 \
+            LD=ld.lld \
+            LLVM_IAS=1
+
+      - name: Collect and Merge DTBs
+        run: |
+          find out/ -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
+
+      
+
+      - name: Copy Kernel to AnyKernel3 ZIP
+        run: |
+          git clone https://github.com/SA9990/AK3_obiwan.git
+
+          cp out/arch/arm64/boot/Image AK3_obiwan/
+          cp out/arch/arm64/boot/dtb AK3_obiwan/
+
+          find out/ -type f -name "*.ko" -exec cp {} AK3_obiwan/modules/system/lib/modules/ \;
+          find out/ -type f -name "dtbo.img" -exec cp {} AK3_obiwan/ \;
+
+          cd AK3_obiwan
+
+          zip -r9 obiwan.zip * -x .git README.md *placeholder
+
+      - name: Upload Anykernel3
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel
+          path: AK3_obiwan/AK3_obiwan.zip
