@@ -3,47 +3,50 @@ name: Kernel Build
 on:
   workflow_dispatch:
 
+env:
+  TZ: Asia/Kolkata
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Kernel Source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Install Build Dependencies
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt update && sudo apt upgrade -y
+          sudo apt update
           sudo apt install -y \
-            git ccache automake flex lzop bison gperf build-essential zip curl \
-            zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev squashfs-tools \
-            pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev \
-            pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl \
-            libxml-simple-perl bc libc6-dev-i386 libx11-dev libgl1-mesa-dev \
-            xsltproc unzip device-tree-compiler python3 aria2 zstd \
-            libncurses-dev libncurses5-dev:i386 libzstd-dev
+            git ccache build-essential bc bison flex libssl-dev libncurses-dev \
+            liblz4-tool libzstd-dev zstd curl python3 unzip aria2 device-tree-compiler
 
-      - name: Download Clang Toolchain
+      - name: Download and Sync Clang Toolchain
         run: |
-          mkdir -p $GITHUB_WORKSPACE/toolchains/clang
-          aria2c -x16 -s16 -k1M https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz
-          mkdir -p $GITHUB_WORKSPACE/toolchains/clang/clang
-          tar -xzf clang-r547379.tar.gz -C $GITHUB_WORKSPACE/toolchains/clang/clang
+          TOOLCHAIN_DIR="$HOME/toolchains/clang"
+          mkdir -p "$TOOLCHAIN_DIR"
+          cd "$TOOLCHAIN_DIR"
+          curl -L "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel/clang-r563880.tar.gz" -o clang-toolchain.tar.gz
+          tar -xvzf clang-toolchain.tar.gz
+
+      - name: Write IST Build Time to File
+        run: |
+          mkdir -p out
+          IST_TIME=$(date +"%Y-%m-%d %H:%M IST")
+          echo "Build Time (IST): $IST_TIME" > out/ist_build_time.txt
 
       - name: Configure and Build Kernel
         run: |
-          export PATH=$GITHUB_WORKSPACE/toolchains/clang/clang/bin:$PATH
-          export KBUILD_BUILD_USER=drogon
-          export KBUILD_BUILD_HOST=ubuntu
+          set -e
+          export PATH="$HOME/toolchains/clang/bin:$PATH"
+          export KBUILD_BUILD_USER="Shreyash"
+          export KBUILD_BUILD_HOST="nand"
 
-          mkdir -p out
-          make O=out ARCH=arm64 vendor/obiwan_defconfig
-
-          make -j$(nproc --all) O=out ARCH=arm64 \
+          make distclean
+          make -j$(nproc) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=$GITHUB_WORKSPACE/toolchains/clang/clang/bin/aarch64-linux-android- \
+            CROSS_COMPILE=$HOME/toolchains/clang/bin/aarch64-linux-android- \
             AR=llvm-ar \
             HOSTCC=clang \
             HOSTCXX=clang++ \
@@ -56,24 +59,31 @@ jobs:
             STRIP=llvm-strip \
             LLVM=1 \
             LD=ld.lld \
-            LLVM_IAS=1
+            LLVM_IAS=1 \
+            vendor/obiwan_defconfig all
 
-      - name: Collect and Merge DTBs
+      - name: Merge DTBs
         run: |
-          find out/ -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
+          find out/arch/arm64/boot/dts/vendor -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
 
-      - name: Copy Kernel to AnyKernel3 ZIP
+      - name: Package with AnyKernel3
         run: |
+          IST_TIME=$(date +"%Y-%m-%d_%H-%M")
+          ZIP_NAME="AK3_obiwan_${IST_TIME}.zip"
+          echo "$ZIP_NAME" > zip_name.txt
+
           git clone https://github.com/SA9990/AK3_obiwan.git
+
           cp out/arch/arm64/boot/Image AK3_obiwan/
           cp out/arch/arm64/boot/dtb AK3_obiwan/
-          find out/ -type f -name "*.ko" -exec cp {} AK3_obiwan/modules/system/lib/modules/ \;
-          find out/ -type f -name "dtbo.img" -exec cp {} AK3_obiwan/ \;
-          cd AK3_obiwan
-          zip -r9 obiwan.zip * -x .git README.md *placeholder
+          find out/ -type f -name "*.ko" -exec cp {} AK3_obiwan/modules/system/lib/modules/ \; || true
+          find out/ -type f -name "dtbo.img" -exec cp {} AK3_obiwan/ \; || true
 
-      - name: Upload AnyKernel3 ZIP
-        uses: actions/upload-artifact@v4
+          cd AK3_obiwan
+          zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
+
+      - name: Upload ZIP to GitHub Artifacts
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: AnyKernel
-          path: AK3_obiwan/obiwan.zip
+          path: "*.zip"
