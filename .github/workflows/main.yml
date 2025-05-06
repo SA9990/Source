@@ -62,6 +62,20 @@ jobs:
             LLVM_IAS=1 \
             vendor/obiwan_defconfig all
 
+      - name: Upload .config File
+        run: |
+          CONFIG_PATH=$(find out/ -name ".config" | head -n 1)
+          echo "Found config at: $CONFIG_PATH"
+          mkdir -p config_upload
+          cp "$CONFIG_PATH" config_upload/kernel.config
+        shell: bash
+
+      - name: Upload Kernel .config File Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: KernelConfig
+          path: config_upload/kernel.config
+
       - name: Merge DTBs
         run: |
           find out/arch/arm64/boot/dts/vendor -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
