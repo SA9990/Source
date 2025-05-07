@@ -8,8 +8,9 @@ env:
   TZ: Asia/Kolkata
 
 jobs:
-  free-disk-space:
+  build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Free Disk Space
         uses: endersonmenezes/free-disk-space@v2
@@ -24,11 +25,6 @@ jobs:
           remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell"
           testing: false
 
-  build:
-    needs: free-disk-space
-    runs-on: ubuntu-latest
-
-    steps:
       - name: Checkout Kernel Source
         uses: actions/checkout@v4.2.2
 
