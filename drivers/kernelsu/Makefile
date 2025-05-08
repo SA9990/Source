@@ -21,7 +21,6 @@ KSU_GIT_VERSION := 1925
 $(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 158))
 $(info -- KernelSU version: $(KSU_VERSION))
 ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
-ccflags-y += -DKSU_VERSION=16
 
 ifeq ($(shell grep -q " current_sid(void)" $(srctree)/security/selinux/include/objsec.h; echo $$?),0)
 ccflags-y += -DKSU_COMPAT_HAS_CURRENT_SID
