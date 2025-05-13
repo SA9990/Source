@@ -30,14 +30,6 @@ $(info -- KernelSU: checks failed, abort.)
 $(error -- Backporting path_umount is mandatory !! Read: https://kernelsu.org/guide/how-to-integrate-for-non-gki.html#how-to-backport-path-umount)
 endif
 
-# Checks hooks state
-ifeq ($(strip $(CONFIG_KSU_MANUAL_HOOK)),y)
-$(info -- KernelSU: Manually-patched hook.)
-else
-$(info -- KernelSU: Kernel-probe hook.)
-ccflags-y += -DCONFIG_KSU_KPROBES_HOOK
-endif
-
 # SELinux drivers check
 ifeq ($(shell grep -q "current_sid(void)" $(srctree)/security/selinux/include/objsec.h; echo $$?),0)
 ccflags-y += -DKSU_COMPAT_HAS_CURRENT_SID
