@@ -11,26 +11,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Free Disk Space
-        uses: endersonmenezes/free-disk-space@v2
-        with:
-          remove_android: true
-          remove_dotnet: true
-          remove_haskell: true
-          remove_tool_cache: true
-          remove_swap: true
-          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
-          remove_packages_one_command: true
-          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell"
-          testing: false
-
       - name: Checkout Kernel Source
         uses: actions/checkout@v4.2.2
 
       - name: Install Build Dependencies
         run: |
           sudo apt autoremove
-          sudo apt update && sudo apt full-upgrade -y
+
           sudo apt install -y \
             git ccache build-essential bc bison flex libssl-dev \
             libncurses-dev liblz4-tool libzstd-dev zstd curl python3 \
@@ -91,7 +78,7 @@ jobs:
             LLVM_IAS=1 \
             HOSTCC=clang \
             HOSTCXX=clang++ \
-            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu-
 
       - name: Upload .config File
         run: |
