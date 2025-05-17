@@ -48,14 +48,14 @@ jobs:
           make -j$(nproc --all) O=out ARCH=arm64 \
           LLVM=1 LLVM_IAS=1 LD=ld.lld \
           HOSTCC=clang HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-android- \
           vendor/obiwan_defconfig
 
 
           make -j$(nproc --all) O=out ARCH=arm64 \
           LLVM=1 LLVM_IAS=1 LD=ld.lld \
           HOSTCC=clang HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-android- \
           
 
       - name: Upload .config File
