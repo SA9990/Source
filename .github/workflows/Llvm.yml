@@ -44,7 +44,7 @@ jobs:
           export PATH="$HOME/toolchains/llvm/bin:$PATH"
           export KBUILD_BUILD_USER="Shreyash"
           export CROSS_COMPILE=aarch64-linux-gnu-
-
+          export CROSS_COMPILE=aarch64-linux-gnu-gcc
           make distclean
 
           make -j$(nproc --all) O=out ARCH=arm64 \
