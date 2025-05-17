@@ -47,7 +47,7 @@ jobs:
 
           make distclean
 
-          make -j$(nproc) O=out ARCH=arm64 \
+          make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
@@ -64,7 +64,7 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- \
             vendor/obiwan_defconfig
 
-          make -j$(nproc) O=out ARCH=arm64 \
+          make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
