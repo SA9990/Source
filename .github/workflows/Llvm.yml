@@ -43,8 +43,7 @@ jobs:
         run: |
           export PATH="$HOME/toolchains/llvm/bin:$PATH"
           export KBUILD_BUILD_USER="Shreyash"
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CROSS_COMPILE=aarch64-linux-gnu-gcc
+          
           make distclean
 
           make -j$(nproc --all) O=out ARCH=arm64 \
@@ -61,6 +60,7 @@ jobs:
             LLVM_IAS=1 \
             HOSTCC=clang \
             HOSTCXX=clang++ \
+            CROSS_COMPILE=aarch64-linux-gnu- \
             vendor/obiwan_defconfig
 
           make -j$(nproc --all) O=out ARCH=arm64 \
@@ -76,6 +76,7 @@ jobs:
             LD=ld.lld \
             LLVM_IAS=1 \
             HOSTCC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
             HOSTCXX=clang++ \
 
       - name: Upload .config File
