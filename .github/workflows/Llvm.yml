@@ -47,13 +47,13 @@ jobs:
           make distclean
           make -j$(nproc --all) O=out ARCH=arm64 \
           LLVM=1 LLVM_IAS=1 LD=ld.lld HOSTCC=clang HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-android- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
           vendor/obiwan_defconfig
 
 
           make -j$(nproc --all) O=out ARCH=arm64 \
           LLVM=1 LLVM_IAS=1 LD=ld.lld HOSTCC=clang HOSTCXX=clang++ \
-          CROSS_COMPILE=aarch64-linux-android- \
+          CROSS_COMPILE=aarch64-linux-gnu- \
           
 
       - name: Upload .config File
