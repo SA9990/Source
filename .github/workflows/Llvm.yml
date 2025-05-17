@@ -45,39 +45,18 @@ jobs:
           export KBUILD_BUILD_USER="Shreyash"
           
           make distclean
+          make -j$(nproc --all) O=out ARCH=arm64 \
+          LLVM=1 LLVM_IAS=1 LD=ld.lld \
+          HOSTCC=clang HOSTCXX=clang++ \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          vendor/obiwan_defconfig
+
 
           make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
-            READELF=llvm-readelf \
-            OBJSIZE=llvm-size \
-            LLVM=1 \
-            LD=ld.lld \
-            LLVM_IAS=1 \
-            HOSTCC=clang \
-            HOSTCXX=clang++ \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            vendor/obiwan_defconfig
-
-          make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
-            READELF=llvm-readelf \
-            OBJSIZE=llvm-size \
-            LLVM=1 \
-            LD=ld.lld \
-            LLVM_IAS=1 \
-            HOSTCC=clang \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            HOSTCXX=clang++ \
+          LLVM=1 LLVM_IAS=1 LD=ld.lld \
+          HOSTCC=clang HOSTCXX=clang++ \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          
 
       - name: Upload .config File
         run: |
