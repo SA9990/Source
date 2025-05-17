@@ -106,7 +106,8 @@ jobs:
 
           git clone https://github.com/SA9990/AK3_obiwan.git
 
-          cp out/arch/arm64/boot/Image-dtb AK3_obiwan/
+          
+          cp out/arch/arm64/boot/Image AK3_obiwan/
           cp out/arch/arm64/boot/dtb AK3_obiwan/
           find out/ -type f -name "*.ko" \
             -exec cp {} AK3_obiwan/modules/system/lib/modules/ \; || true
