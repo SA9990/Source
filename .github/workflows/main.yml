@@ -1,4 +1,4 @@
-name: Kernel Build(neutron)
+name: Kernel Build (neutron)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
 
       - name: Install Build Dependencies
         run: |
-            sudo apt install -y \
+          sudo apt install -y \
             git ccache build-essential bc bison flex libssl-dev libncurses-dev \
             liblz4-tool libzstd-dev zstd curl python3 unzip aria2 device-tree-compiler binutils-aarch64-linux-gnu
 
@@ -28,12 +28,6 @@ jobs:
           curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
           chmod +x antman
           ./antman -S
-     
-      - name: Write IST Build Time to File
-        run: |
-          mkdir -p out
-          IST_TIME=$(date +"%Y-%m-%d %H:%M IST")
-          echo "Build Time (IST): $IST_TIME" > out/ist_build_time.txt
 
       - name: Configure and Build Kernel
         run: |
@@ -45,13 +39,13 @@ jobs:
             CC=clang \
             CROSS_COMPILE=aarch64-linux-gnu- \
             LLVM=1 \
-            LLVM_IAS=1 \
+            LLVM_IAS=1
 
           make -j$(nproc) O=out ARCH=arm64 \
             CC=clang \
             CROSS_COMPILE=aarch64-linux-gnu- \
             LLVM=1 \
-            LLVM_IAS=1 \
+            LLVM_IAS=1
 
       - name: Merge DTBs
         run: |
@@ -59,9 +53,9 @@ jobs:
 
       - name: Package with AnyKernel3
         run: |
+          export TZ=Asia/Kolkata
           IST_TIME=$(date +"%Y-%m-%d_%H-%M")
           ZIP_NAME="AK3_obiwan_${IST_TIME}.zip"
-          echo "$ZIP_NAME" > zip_name.txt
 
           git clone https://github.com/SA9990/AK3_obiwan.git
 
