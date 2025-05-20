@@ -1,4 +1,4 @@
-name: Kernel Build (llvm)
+name: Kernel Build (LLVM)
 
 on:
   workflow_dispatch:
@@ -16,6 +16,7 @@ jobs:
 
       - name: Install Build Dependencies
         run: |
+          sudo apt update
           sudo apt install -y \
             git \
             ccache \
@@ -77,6 +78,7 @@ jobs:
           export TZ=Asia/Kolkata
           IST_TIME=$(date +"%Y-%m-%d_%H-%M")
           ZIP_NAME="${IST_TIME}.zip"
+          echo "$ZIP_NAME" > zip_name.txt
 
           git clone https://github.com/SA9990/AK3_obiwan.git
 
@@ -96,8 +98,20 @@ jobs:
             README.md \
             *placeholder
 
-      - name: Upload ZIP to GitHub Artifacts
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: AnyKernel
-          path: "*.zip"
+      - name: Upload to Telegram
+        env:
+          API_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ZIP_NAME=$(cat zip_name.txt)
+          FILE_PATH="$ZIP_NAME"
+
+          if [[ ! -s "$FILE_PATH" ]]; then
+            echo "ERROR: File does not exist or is empty: $FILE_PATH"
+            exit 1
+          fi
+
+          curl -X POST "https://api.telegram.org/bot$API_TOKEN/sendDocument" \
+            -F chat_id="$CHAT_ID" \
+            -F document=@"$FILE_PATH" \
+            -F caption="Kernel build uploaded: $ZIP_NAME"
