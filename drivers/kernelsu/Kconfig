@@ -31,4 +31,13 @@ config KSU_LSM_SECURITY_HOOKS
 	  Disabling this is mostly only useful for kernel 4.1 and older.
 	  Make sure to implement manual hooks on security/security.c.
 
+config KSU_USE_STRUCT_FILENAME
+	bool "use struct filename"
+        depends on KSU
+        default y
+	help
+	  Disable this to remove all functions using 'struct filename'. Also useful if
+	  youre using pure syscall hooks and your compiler/linker lacks DCE.
+	  Make sure you are using proper sys_execve / compat_sys_execve hooks.
+
 endmenu

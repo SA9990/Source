@@ -64,8 +64,11 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 	}
 
 	char path[sizeof(su) + 1];
-	memset(path, 0, sizeof(path));
-	ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+	long len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+	if (len <= 0 || len > sizeof(path))
+		return 0;
+
+	path[sizeof(path) - 1] = '\0';
 
 	if (unlikely(!memcmp(path, su, sizeof(su)))) {
 		pr_info("faccessat su->sh!\n");
@@ -93,8 +96,11 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 	}
 
 	char path[sizeof(su) + 1];
-	memset(path, 0, sizeof(path));
-	ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+	long len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
+	if (len <= 0 || len > sizeof(path))
+		return 0;
+
+	path[sizeof(path) - 1] = '\0';
 
 	if (unlikely(!memcmp(path, su, sizeof(su)))) {
 		pr_info("newfstatat su->sh!\n");
@@ -104,6 +110,7 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 	return 0;
 }
 
+#ifdef CONFIG_KSU_USE_STRUCT_FILENAME
 // the call from execve_handler_pre won't provided correct value for __never_use_argument, use them after fix execve_handler_pre, keeping them for consistence for manually patched code
 int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 				 void *__never_use_argv, void *__never_use_envp,
@@ -138,6 +145,7 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 
 	return 0;
 }
+#endif //CONFIG_KSU_USE_STRUCT_FILENAME
 
 int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 			       void *__never_use_argv, void *__never_use_envp,
