@@ -55,9 +55,8 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 {
 	const char su[] = SU_PATH;
 
-	if (!ksu_sucompat_non_kp) {
+	if (unlikely(!ksu_sucompat_non_kp))
 		return 0;
-	}
 	
 	if (!ksu_is_allow_uid(current_uid().val)) {
 		return 0;
@@ -65,7 +64,7 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 
 	char path[sizeof(su) + 1];
 	long len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
-	if (len <= 0 || len > sizeof(path))
+	if (len <= 0)
 		return 0;
 
 	path[sizeof(path) - 1] = '\0';
@@ -83,10 +82,9 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 	// const char sh[] = SH_PATH;
 	const char su[] = SU_PATH;
 
-	if (!ksu_sucompat_non_kp) {
+	if (unlikely(!ksu_sucompat_non_kp))
 		return 0;
-	}
-	
+
 	if (!ksu_is_allow_uid(current_uid().val)) {
 		return 0;
 	}
@@ -97,7 +95,7 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 
 	char path[sizeof(su) + 1];
 	long len = ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
-	if (len <= 0 || len > sizeof(path))
+	if (len <= 0)
 		return 0;
 
 	path[sizeof(path) - 1] = '\0';
@@ -111,6 +109,15 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 }
 
 #ifdef KSU_USE_STRUCT_FILENAME
+/*
+ * DEPRECATION NOTICE:
+ * This function (ksu_handle_execveat_sucompat) is deprecated and retained
+ * only for compatibility with legacy hooks that uses struct filename.
+ * New builds should use ksu_handle_execve_sucompat() directly.
+ *
+ * This function may be removed in future rebases.
+ *
+ */
 // the call from execve_handler_pre won't provided correct value for __never_use_argument, use them after fix execve_handler_pre, keeping them for consistence for manually patched code
 int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 				 void *__never_use_argv, void *__never_use_envp,
@@ -120,9 +127,8 @@ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
 	const char sh[] = KSUD_PATH;
 	const char su[] = SU_PATH;
 
-	if (!ksu_sucompat_non_kp){
+	if (unlikely(!ksu_sucompat_non_kp))
 		return 0;
-	}
 	
 	if (!ksu_is_allow_uid(current_uid().val))
 		return 0;
@@ -154,9 +160,8 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 	const char su[] = SU_PATH;
 	char path[sizeof(su) + 1];
 
-	if (!ksu_sucompat_non_kp){
+	if (unlikely(!ksu_sucompat_non_kp))
 		return 0;
-	}
 
 	if (!ksu_is_allow_uid(current_uid().val))
 		return 0;
@@ -164,9 +169,11 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 	if (unlikely(!filename_user))
 		return 0;
 
-	// nofault variant fails probably due to pagefault_disable
-	// some cpus dont really have that good speculative execution
-	// substitute set_fs, check if pointer is valid
+	/*
+	 * nofault variant fails silently due to pagefault_disable
+	 * some cpus dont really have that good speculative execution
+	 * access_ok to substitute set_fs, we check if pointer is accessible
+	 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 	if (!access_ok(VERIFY_READ, *filename_user, sizeof(path)))
 		return 0;
@@ -176,7 +183,7 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 #endif
 	// success = returns number of bytes and should be less than path
 	long len = strncpy_from_user(path, *filename_user, sizeof(path));
-	if (len <= 0 || len > sizeof(path))
+	if (len <= 0)
 		return 0;
 
 	// strncpy_from_user_nofault does this too
@@ -195,10 +202,9 @@ int ksu_handle_execve_sucompat(int *fd, const char __user **filename_user,
 
 int ksu_handle_devpts(struct inode *inode)
 {
-	if (!ksu_sucompat_non_kp) {
+	if (unlikely(!ksu_sucompat_non_kp))
 		return 0;
-	}
-	
+
 	if (!current->mm) {
 		return 0;
 	}

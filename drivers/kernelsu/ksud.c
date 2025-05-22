@@ -271,7 +271,26 @@ static int __ksu_handle_execveat_ksud(int *fd, char *filename,
 }
 
 #ifdef KSU_USE_STRUCT_FILENAME
-// keep this for manually hooked builds
+/*
+ * DEPRECATION NOTICE:
+ * This function (ksu_handle_execveat_ksud) is deprecated and retained only for 
+ * compatibility with legacy hooks that uses struct filename.
+ * New builds should using ksu_handle_execve_ksud() and ksu_handle_compat_execve_ksud()
+ *
+ * This wrapper may be removed in future rebases.
+ *
+ * Quoting a weird take for posterity:
+ *
+ *   "The first member of the struct filename is name, so the pointer to the struct
+ *    points to name. This creates an implicit dependency. Although it may remain
+ *    the same indefinitely, any change will cause a panic. The benefits apply only
+ *    to pre-3.7 kernels, making it not worth the effort."
+ * 	- https://github.com/tiann/KernelSU/pull/2595#issuecomment-2888960286
+ *
+ * Okay. He actually thinks that that's a *good* thing?
+ * Incredible. Weaponized optimism in C.
+ *
+ */
 __maybe_unused int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 			     struct user_arg_ptr *argv, struct user_arg_ptr *envp,
 			     int *flags)
@@ -498,7 +517,7 @@ __maybe_unused static int __ksu_handle_execve_ksud(const char __user *filename_u
 		return 0;
 
 	long len = ksu_strncpy_from_user_nofault(path, filename_user, 32);
-	if (len <= 0 || len > 32)
+	if (len <= 0)
 		return 0;
 
 	path[sizeof(path) - 1] = '\0';

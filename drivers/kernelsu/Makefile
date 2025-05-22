@@ -16,9 +16,9 @@ ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-
 
 obj-$(CONFIG_KSU) += kernelsu.o
 
-KSU_GIT_VERSION := 1944
+KSU_GIT_VERSION := 1946
 # ksu_version: major * 10000 + git version + 200 for historical reasons
-$(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 151))
+$(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 149))
 $(info -- KernelSU version: $(KSU_VERSION))
 ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
 
@@ -48,6 +48,11 @@ $(info -- KernelSU Manager signature hash: $(KSU_EXPECTED_HASH))
 
 ccflags-y += -DEXPECTED_SIZE=$(KSU_EXPECTED_SIZE)
 ccflags-y += -DEXPECTED_HASH=\"$(KSU_EXPECTED_HASH)\"
+
+# UL, look for "ext4_unregister_sysfs" on fs/ext4
+ifeq ($(shell grep -q "^extern void ext4_unregister_sysfs" $(srctree)/fs/ext4/ext4.h 2>/dev/null; echo $$?),0)
+ccflags-y += -DKSU_HAS_MODERN_EXT4
+endif
 
 # enable functions that use stuct filename when ksu_handle_execveat is found
 ifeq ($(shell grep -q "ksu_handle_execveat" $(srctree)/fs/exec.c; echo $$?),0)
