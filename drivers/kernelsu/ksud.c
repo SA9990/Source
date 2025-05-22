@@ -270,7 +270,7 @@ static int __ksu_handle_execveat_ksud(int *fd, char *filename,
 	return 0;
 }
 
-#ifdef CONFIG_KSU_USE_STRUCT_FILENAME
+#ifdef KSU_USE_STRUCT_FILENAME
 // keep this for manually hooked builds
 __maybe_unused int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 			     struct user_arg_ptr *argv, struct user_arg_ptr *envp,
@@ -290,7 +290,7 @@ __maybe_unused int ksu_handle_execveat_ksud(int *fd, struct filename **filename_
 
 	return __ksu_handle_execveat_ksud(fd, (char *)filename->name, argv, envp, flags);
 }
-#endif // CONFIG_KSU_USE_STRUCT_FILENAME
+#endif // KSU_USE_STRUCT_FILENAME
 
 static ssize_t (*orig_read)(struct file *, char __user *, size_t, loff_t *);
 static ssize_t (*orig_read_iter)(struct kiocb *, struct iov_iter *);
