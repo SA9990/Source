@@ -1,0 +1,139 @@
+name: Kernel Build (AOSP Clang)
+
+on:
+  workflow_dispatch:
+
+env:
+  TZ: Asia/Kolkata
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4.2.2
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git \
+            ccache \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses-dev \
+            liblz4-tool \
+            libzstd-dev \
+            zstd \
+            curl \
+            python3 \
+            unzip \
+            aria2 \
+            device-tree-compiler \
+            binutils-aarch64-linux-gnu
+
+      - name: Download AOSP Clang Toolchain
+        run: |
+          TOOLCHAIN_DIR="$HOME/toolchains/aosp-clang"
+          mkdir -p "$TOOLCHAIN_DIR"
+          cd "$TOOLCHAIN_DIR"
+
+          curl -LO "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel/clang-r563880.tar.gz"
+          tar -xzf clang-r563880.tar.gz
+
+      - name: Configure and Build Kernel
+        run: |
+          export PATH="$HOME/toolchains/aosp-clang/bin:$PATH"
+          make distclean
+
+          make -j$(nproc) \
+            O=out \
+            vendor/obiwan_defconfig \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 \
+            LLVM_IAS=1
+
+          make -j$(nproc) \
+            O=out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 \
+            LLVM_IAS=1
+
+      - name: Merge DTBs
+        run: |
+          find out/arch/arm64/boot/dts/vendor \
+            -name '*.dtb' \
+            -exec cat {} + > out/arch/arm64/boot/dtb
+
+      - name: Package with AnyKernel3
+        run: |
+          export TZ=Asia/Kolkata
+          IST_TIME=$(date +"%Y-%m-%d_%H-%M")
+          ZIP_NAME="${IST_TIME}.zip"
+          echo "$ZIP_NAME" > zip_name.txt
+
+          git clone https://github.com/SA9990/AK3_obiwan.git
+
+          cp out/arch/arm64/boot/Image AK3_obiwan/
+          cp out/arch/arm64/boot/dtb AK3_obiwan/
+
+          find out/ -type f -name "*.ko" \
+            -exec cp {} AK3_obiwan/modules/system/lib/modules/ \; || true
+
+          find out/ -type f -name "dtbo.img" \
+            -exec cp {} AK3_obiwan/ \; || true
+
+          cd AK3_obiwan
+
+          zip -r9 "../$ZIP_NAME" * \
+            -x .git \
+            README.md \
+            *placeholder
+
+      - name: Upload Kernel Zip as Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: kernel-build
+          path: ${{ github.workspace }}/*.zip
+
+      - name: Upload to Telegram
+        env:
+          API_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ZIP_NAME=$(cat zip_name.txt)
+          FILE_PATH="$ZIP_NAME"
+
+          if [[ ! -s "$FILE_PATH" ]]; then
+            echo "ERROR: File does not exist or is empty: $FILE_PATH"
+            exit 1
+          fi
+
+          curl -X POST "https://api.telegram.org/bot$API_TOKEN/sendDocument" \
+            -F chat_id="$CHAT_ID" \
+            -F document=@"$FILE_PATH" \
+            -F caption="Kernel build uploaded: $ZIP_NAME"
+
+
+      - name: Upload .config File
+        run: |
+          CONFIG_PATH=$(find out/ -name ".config" | head -n 1)
+          echo "Found config at: $CONFIG_PATH"
+          mkdir -p config_upload
+          cp "$CONFIG_PATH" config_upload/kernel.config
+        shell: bash            
+
+
+      - name: Upload Kernel .config File Artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: KernelConfig
+          path: config_upload/kernel.config
