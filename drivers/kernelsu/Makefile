@@ -16,7 +16,8 @@ ccflags-y += -I$(objtree)/security/selinux -include $(srctree)/include/uapi/asm-
 
 obj-$(CONFIG_KSU) += kernelsu.o
 
-KSU_GIT_VERSION := 1969
+
+KSU_GIT_VERSION := 1972
 # ksu_version: major * 10000 + git version + 200 for historical reasons
 $(eval KSU_VERSION=$(shell expr 10000 + $(KSU_GIT_VERSION) + 200))
 $(info -- KernelSU version: $(KSU_VERSION))
@@ -24,10 +25,7 @@ ccflags-y += -DKSU_VERSION=$(KSU_VERSION)
 
 # Do checks before compile
 ifeq ($(shell grep -q "int\s\+\path_umount" $(srctree)/fs/namespace.c; echo $$?),0)
-$(info -- KernelSU: checks ok. Found path_umount)
-else
-$(info -- KernelSU: checks failed, abort.)
-$(error -- Backporting path_umount is mandatory !! Read: https://kernelsu.org/guide/how-to-integrate-for-non-gki.html#how-to-backport-path-umount)
+ccflags-y += -DKSU_HAS_PATH_UMOUNT
 endif
 
 
