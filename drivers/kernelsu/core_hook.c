@@ -24,7 +24,7 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #ifndef KSU_HAS_PATH_UMOUNT
-#include <linux/syscalls.h> // sys_umount
+#include <linux/syscalls.h> // sys_umount (<4.17) & ksys_umount (4.17+)
 #endif
 
 #ifdef MODULE
@@ -528,26 +528,26 @@ static bool should_umount(struct path *path)
 	return false;
 }
 
-#ifdef KSU_HAS_PATH_UMOUNT
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0) || defined(KSU_HAS_PATH_UMOUNT)
 static void ksu_path_umount(const char *mnt, struct path *path, int flags)
 {
-	int err = path_umount(path, flags);
-	pr_info("%s: path: %s ret: %d\n", __func__, mnt, err);
+	int ret = path_umount(path, flags);
+	pr_info("%s: path: %s ret: %d\n", __func__, mnt, ret);
 }
 #else
 static void ksu_sys_umount(const char *mnt, int flags)
 {
 	char __user *usermnt = (char __user *)mnt;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 	mm_segment_t old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	long ret = sys_umount(usermnt, flags); // cuz asmlinkage long sys##name
-	set_fs(old_fs);
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	int ret = ksys_umount(usermnt, flags);
+#else
+	long ret = sys_umount(usermnt, flags); // cuz asmlinkage long sys##name
 #endif
-	pr_info("%s: path: %s ret: %d \n", __func__, usermnt, ret);
+	set_fs(old_fs);
+	pr_info("%s: path: %s ret: %d\n", __func__, usermnt, ret);
 }
 #endif
 
