@@ -1213,6 +1213,10 @@ int usb_add_gadget_udc_release(struct device *parent, struct usb_gadget *gadget,
 	INIT_WORK(&gadget->work, usb_gadget_state_work);
 	gadget->dev.parent = parent;
 
+	dma_set_coherent_mask(&gadget->dev, parent->coherent_dma_mask);
+	gadget->dev.dma_parms = parent->dma_parms;
+	gadget->dev.dma_mask = parent->dma_mask;
+
 	if (release)
 		gadget->dev.release = release;
 	else
@@ -1323,7 +1327,7 @@ EXPORT_SYMBOL_GPL(usb_add_gadget_udc);
 
 static void usb_gadget_remove_driver(struct usb_udc *udc)
 {
-	dev_dbg(&udc->dev, "unregistering UDC driver [%s]\n",
+	dev_info(&udc->dev, "unregistering UDC driver [%s]\n",
 			udc->driver->function);
 
 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
@@ -1378,7 +1382,7 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
 {
 	int ret;
 
-	dev_dbg(&udc->dev, "registering UDC driver [%s]\n",
+	dev_info(&udc->dev, "registering UDC driver [%s]\n",
 			driver->function);
 
 	udc->driver = driver;
