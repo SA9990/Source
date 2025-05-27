@@ -59,6 +59,10 @@
 #include <linux/cpu.h>
 #include <net/sock.h>
 
+#ifdef CONFIG_CGF_NOTIFY_EVENT
+#include <linux/notifier.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/cgroup.h>
 
@@ -728,7 +732,8 @@ struct css_set init_css_set = {
 	.task_iters		= LIST_HEAD_INIT(init_css_set.task_iters),
 	.threaded_csets		= LIST_HEAD_INIT(init_css_set.threaded_csets),
 	.cgrp_links		= LIST_HEAD_INIT(init_css_set.cgrp_links),
-	.mg_preload_node	= LIST_HEAD_INIT(init_css_set.mg_preload_node),
+	.mg_src_preload_node	= LIST_HEAD_INIT(init_css_set.mg_src_preload_node),
+	.mg_dst_preload_node	= LIST_HEAD_INIT(init_css_set.mg_dst_preload_node),
 	.mg_node		= LIST_HEAD_INIT(init_css_set.mg_node),
 
 	/*
@@ -1202,7 +1207,8 @@ static struct css_set *find_css_set(struct css_set *old_cset,
 	INIT_LIST_HEAD(&cset->threaded_csets);
 	INIT_HLIST_NODE(&cset->hlist);
 	INIT_LIST_HEAD(&cset->cgrp_links);
-	INIT_LIST_HEAD(&cset->mg_preload_node);
+	INIT_LIST_HEAD(&cset->mg_src_preload_node);
+	INIT_LIST_HEAD(&cset->mg_dst_preload_node);
 	INIT_LIST_HEAD(&cset->mg_node);
 
 	/* Copy the set of subsystem state objects generated in
@@ -2564,21 +2570,27 @@ int cgroup_migrate_vet_dst(struct cgroup *dst_cgrp)
  */
 void cgroup_migrate_finish(struct cgroup_mgctx *mgctx)
 {
-	LIST_HEAD(preloaded);
 	struct css_set *cset, *tmp_cset;
 
 	lockdep_assert_held(&cgroup_mutex);
 
 	spin_lock_irq(&css_set_lock);
 
-	list_splice_tail_init(&mgctx->preloaded_src_csets, &preloaded);
-	list_splice_tail_init(&mgctx->preloaded_dst_csets, &preloaded);
-
-	list_for_each_entry_safe(cset, tmp_cset, &preloaded, mg_preload_node) {
+	list_for_each_entry_safe(cset, tmp_cset, &mgctx->preloaded_src_csets,
+				 mg_src_preload_node) {
 		cset->mg_src_cgrp = NULL;
 		cset->mg_dst_cgrp = NULL;
 		cset->mg_dst_cset = NULL;
-		list_del_init(&cset->mg_preload_node);
+		list_del_init(&cset->mg_src_preload_node);
+		put_css_set_locked(cset);
+	}
+
+	list_for_each_entry_safe(cset, tmp_cset, &mgctx->preloaded_dst_csets,
+				 mg_dst_preload_node) {
+		cset->mg_src_cgrp = NULL;
+		cset->mg_dst_cgrp = NULL;
+		cset->mg_dst_cset = NULL;
+		list_del_init(&cset->mg_dst_preload_node);
 		put_css_set_locked(cset);
 	}
 
@@ -2620,7 +2632,7 @@ void cgroup_migrate_add_src(struct css_set *src_cset,
 
 	src_cgrp = cset_cgroup_from_root(src_cset, dst_cgrp->root);
 
-	if (!list_empty(&src_cset->mg_preload_node))
+	if (!list_empty(&src_cset->mg_src_preload_node))
 		return;
 
 	WARN_ON(src_cset->mg_src_cgrp);
@@ -2631,7 +2643,7 @@ void cgroup_migrate_add_src(struct css_set *src_cset,
 	src_cset->mg_src_cgrp = src_cgrp;
 	src_cset->mg_dst_cgrp = dst_cgrp;
 	get_css_set(src_cset);
-	list_add_tail(&src_cset->mg_preload_node, &mgctx->preloaded_src_csets);
+	list_add_tail(&src_cset->mg_src_preload_node, &mgctx->preloaded_src_csets);
 }
 
 /**
@@ -2656,7 +2668,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 
 	/* look up the dst cset for each src cset and link it to src */
 	list_for_each_entry_safe(src_cset, tmp_cset, &mgctx->preloaded_src_csets,
-				 mg_preload_node) {
+				 mg_src_preload_node) {
 		struct css_set *dst_cset;
 		struct cgroup_subsys *ss;
 		int ssid;
@@ -2675,7 +2687,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 		if (src_cset == dst_cset) {
 			src_cset->mg_src_cgrp = NULL;
 			src_cset->mg_dst_cgrp = NULL;
-			list_del_init(&src_cset->mg_preload_node);
+			list_del_init(&src_cset->mg_src_preload_node);
 			put_css_set(src_cset);
 			put_css_set(dst_cset);
 			continue;
@@ -2683,8 +2695,8 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
 
 		src_cset->mg_dst_cset = dst_cset;
 
-		if (list_empty(&dst_cset->mg_preload_node))
-			list_add_tail(&dst_cset->mg_preload_node,
+		if (list_empty(&dst_cset->mg_dst_preload_node))
+			list_add_tail(&dst_cset->mg_dst_preload_node,
 				      &mgctx->preloaded_dst_csets);
 		else
 			put_css_set(dst_cset);
@@ -2915,7 +2927,8 @@ static int cgroup_update_dfl_csses(struct cgroup *cgrp)
 		goto out_finish;
 
 	spin_lock_irq(&css_set_lock);
-	list_for_each_entry(src_cset, &mgctx.preloaded_src_csets, mg_preload_node) {
+	list_for_each_entry(src_cset, &mgctx.preloaded_src_csets,
+			    mg_src_preload_node) {
 		struct task_struct *task, *ntask;
 
 		/* all tasks in src_csets need to be migrated */
@@ -3227,6 +3240,106 @@ static int cgroup_vet_subtree_control_enable(struct cgroup *cgrp, u16 enable)
 
 	return 0;
 }
+#ifdef CONFIG_CGF_NOTIFY_EVENT
+static int attach_task_by_pid(struct cgroup *cgrp, u64 pid, bool threadgroup)
+{
+	struct task_struct *tsk;
+	const struct cred *cred = current_cred();
+	const struct cred *tcred;
+	struct cgroup_subsys *ss;
+	int ssid=0;
+	int ret=0;
+
+	if (pid < 0)
+		return -EINVAL;
+
+	if (!cgroup_tryget(cgrp))
+		return -ENODEV;
+
+	mutex_lock(&cgroup_mutex);
+	if (cgroup_is_dead(cgrp)) {
+		mutex_unlock(&cgroup_mutex);
+		cgroup_put(cgrp);
+		return -ENODEV;
+	}
+
+	percpu_down_write(&cgroup_threadgroup_rwsem);
+	rcu_read_lock();
+	if (pid) {
+		tsk = find_task_by_vpid(pid);
+		if (!tsk) {
+			ret = -ESRCH;
+			goto out_unlock_rcu;
+		}
+	} else {
+		tsk = current;
+	}
+
+	if (threadgroup)
+		tsk = tsk->group_leader;
+
+	if (tsk->no_cgroup_migration || (tsk->flags & PF_NO_SETAFFINITY)) {
+		ret = -EINVAL;
+		goto out_unlock_rcu;
+	}
+
+	get_task_struct(tsk);
+	rcu_read_unlock();
+
+	tcred = get_task_cred(tsk);
+	if (!uid_eq(cred->euid, GLOBAL_ROOT_UID) &&
+	    !uid_eq(cred->euid, tcred->uid) &&
+	    !uid_eq(cred->euid, tcred->suid) &&
+        !ns_capable(tcred->user_ns, CAP_SYS_NICE))
+		ret = -EACCES;
+	
+	if (!ret && cgroup_on_dfl(cgrp)) {
+		struct cgroup *cgrp_tmp;
+
+		spin_lock_irq(&css_set_lock);
+		cgrp_tmp = task_cgroup_from_root(tsk, &cgrp_dfl_root);
+		spin_unlock_irq(&css_set_lock);
+		while (!cgroup_is_descendant(cgrp, cgrp_tmp))
+			cgrp_tmp = cgroup_parent(cgrp_tmp);
+	}
+
+	put_cred(tcred);
+	if (!ret)
+		ret = cgroup_attach_task(cgrp, tsk, threadgroup);
+	put_task_struct(tsk);
+	goto out_unlock_threadgroup;
+
+out_unlock_rcu:
+	rcu_read_unlock();
+out_unlock_threadgroup:
+	percpu_up_write(&cgroup_threadgroup_rwsem);
+	for_each_subsys(ss, ssid)
+		if (ss->post_attach)
+			ss->post_attach();
+	mutex_unlock(&cgroup_mutex);
+	cgroup_put(cgrp);
+	return ret;
+}
+
+int cgf_attach_task_group(struct cgroup *cgrp, u64 pid)
+{
+//	struct freezer *freezer = container_of(event, struct freezer, event);
+//	struct task_struct *p;
+	int ret = 0;
+
+/*	if(!freezer->event.data) {
+		ret = -EINVAL;
+		goto out_invalid_data;
+	}
+	p = freezer->event.data;
+*/
+//	printk(KERN_ERR"[CGF] %s, return: %d, pid: %d\n", __func__, ret, pid);
+	ret = attach_task_by_pid(cgrp, pid, true);
+//out_invalid_data:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(cgf_attach_task_group);
+#endif
 
 /* change the enabled child controllers for a cgroup in the default hierarchy */
 static ssize_t cgroup_subtree_control_write(struct kernfs_open_file *of,
@@ -6180,6 +6293,15 @@ static int __init cgroup_disable(char *str)
 			static_branch_disable(cgroup_subsys_enabled_key[i]);
 			pr_info("Disabling %s control group subsystem\n",
 				ss->name);
+		}
+
+		for (i = 0; i < OPT_FEATURE_COUNT; i++) {
+			if (strcmp(token, cgroup_opt_feature_names[i]))
+				continue;
+			cgroup_feature_disable_mask |= 1 << i;
+			pr_info("Disabling %s control group feature\n",
+				cgroup_opt_feature_names[i]);
+			break;
 		}
 
 		for (i = 0; i < OPT_FEATURE_COUNT; i++) {
