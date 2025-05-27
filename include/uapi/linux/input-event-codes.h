@@ -274,6 +274,11 @@
 #define KEY_F23			193
 #define KEY_F24			194
 
+#define GPBTN_M1			0xc4
+#define GPBTN_M2			0xc5
+#define GPBTN_M3			0xc6
+#define GPBTN_M4			0xc7
+
 #define KEY_PLAYCD		200
 #define KEY_PAUSECD		201
 #define KEY_PROG3		202
@@ -798,11 +803,7 @@
 #define SW_MUTE_DEVICE		0x0e  /* set = device disabled */
 #define SW_PEN_INSERTED		0x0f  /* set = pen inserted */
 #define SW_MACHINE_COVER	0x10  /* set = cover closed */
-#define SW_HPHL_OVERCURRENT	0x11  /* set = over current on left hph */
-#define SW_HPHR_OVERCURRENT	0x12  /* set = over current on right hph */
-#define SW_MICROPHONE2_INSERT	0x13  /* set = inserted */
-#define SW_UNSUPPORT_INSERT	0x14  /* set = unsupported device inserted */
-#define SW_MAX			0x20
+#define SW_MAX			0x10
 #define SW_CNT			(SW_MAX+1)
 
 /*

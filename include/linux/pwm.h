@@ -61,14 +61,24 @@ enum pwm_output_type {
 
 /**
  * struct pwm_output_pattern - PWM duty pattern for MODULATED duty type
- * @duty_pattern: PWM duty cycles in the pattern for duty modulation
+ * @duty_pattern_percentages: PWM duty cycles in the pattern for duty modulation in percentage
  * @num_entries: number of entries in the pattern
- * @cycles_per_duty: number of PWM period cycles an entry stays at
+ * @step_ms: time period an entry stays at
+ * @pause_hi_count: pause time in step during high
+ * @pause_lo_count: pause time in step during low
+ * @ramp_dir_low_to_hi: LPG ramping direction
+ * @pattern_repeat: LPG would be ramping with the LUT pattern repeatedly
+ * @toggle: LPG would toggle the LUT pattern in ramping
  */
 struct pwm_output_pattern {
-	u64 *duty_pattern;
+	u64 *duty_pattern_percentages;
 	unsigned int num_entries;
-	u64 cycles_per_duty;
+	u64 step_ms;
+	u8 pause_hi_count;
+	u8 pause_lo_count;
+	bool ramp_dir_low_to_hi;
+	bool pattern_repeat;
+	bool toggle;
 };
 
 /*
@@ -424,8 +434,8 @@ int pwm_adjust_config(struct pwm_device *pwm);
 static inline int pwm_get_output_type_supported(struct pwm_device *pwm)
 {
 	if (pwm->chip->ops->get_output_type_supported != NULL)
-		return pwm->chip->ops->get_output_type_supported(pwm->chip,
-								 pwm);
+		return pwm->chip->ops->
+			get_output_type_supported(pwm->chip, pwm);
 	else
 		return PWM_OUTPUT_FIXED;
 }
