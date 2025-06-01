@@ -1,0 +1,123 @@
+name: Kernel Build (LLVM)
+
+on:
+  workflow_dispatch:
+
+env:
+  TZ: Asia/Kolkata
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4.2.2
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git \
+            ccache \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses-dev \
+            liblz4-tool \
+            libzstd-dev \
+            zstd \
+            curl \
+            python3 \
+            unzip \
+            aria2 \
+            device-tree-compiler \
+            binutils-aarch64-linux-gnu
+
+      - name: Download LLVM Toolchain
+        run: |
+          TOOLCHAIN_DIR="$HOME/toolchains/llvm"
+          mkdir -p "$TOOLCHAIN_DIR"
+          cd "$TOOLCHAIN_DIR"
+
+          curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.6/LLVM-20.1.6-Linux-X64.tar.xz"
+          tar -xf LLVM-20.1.6-Linux-X64.tar.xz --strip-components=1
+
+      - name: Configure and Build Kernel
+        run: |
+          export PATH="$HOME/toolchains/llvm/bin:$PATH"
+          make distclean
+
+          make -j$(nproc) \
+            O=out \
+            vendor/obiwan_defconfig \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 \
+            LLVM_IAS=1
+
+          make -j$(nproc) \
+            O=out \
+            ARCH=arm64 \
+            CC=clang \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 \
+            LLVM_IAS=1
+
+      - name: Merge DTBs
+        run: |
+          find out/arch/arm64/boot/dts/vendor \
+            -name '*.dtb' \
+            -exec cat {} + > out/arch/arm64/boot/dtb
+
+      - name: Package with AnyKernel3
+        run: |
+          export TZ=Asia/Kolkata
+          IST_TIME=$(date +"%Y-%m-%d_%H-%M")
+          ZIP_NAME="${IST_TIME}.zip"
+          echo "$ZIP_NAME" > zip_name.txt
+
+          git clone https://github.com/SA9990/AK3_obiwan.git
+
+          cp out/arch/arm64/boot/Image AK3_obiwan/
+          cp out/arch/arm64/boot/dtb AK3_obiwan/
+
+          find out/ -type f -name "*.ko" \
+            -exec cp {} AK3_obiwan/modules/system/lib/modules/ \; || true
+
+          find out/ -type f -name "dtbo.img" \
+            -exec cp {} AK3_obiwan/ \; || true
+
+          cd AK3_obiwan
+
+          zip -r9 "../$ZIP_NAME" * \
+            -x .git \
+            README.md \
+            *placeholder
+
+      - name: Upload ZIP to GitHub Artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: AnyKernel
+          path: "*.zip"
+
+      - name: Upload to Telegram
+        env:
+          API_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          ZIP_NAME=$(cat zip_name.txt)
+          FILE_PATH="$ZIP_NAME"
+
+          if [[ ! -s "$FILE_PATH" ]]; then
+            echo "ERROR: File does not exist or is empty: $FILE_PATH"
+            exit 1
+          fi
+
+          curl -X POST "https://api.telegram.org/bot$API_TOKEN/sendDocument" \
+            -F chat_id="$CHAT_ID" \
+            -F document=@"$FILE_PATH" \
+            -F caption="Kernel build uploaded: $ZIP_NAME"
