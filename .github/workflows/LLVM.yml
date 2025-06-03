@@ -42,8 +42,8 @@ jobs:
           mkdir -p "$TOOLCHAIN_DIR"
           cd "$TOOLCHAIN_DIR"
 
-          curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.5/LLVM-20.1.5-Linux-X64.tar.xz"
-          tar -xf LLVM-20.1.5-Linux-X64.tar.xz --strip-components=1
+          curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.6/LLVM-20.1.6-Linux-X64.tar.xz"
+          tar -xf LLVM-20.1.6-Linux-X64.tar.xz --strip-components=1
 
       - name: Configure and Build Kernel
         run: |
