@@ -570,6 +570,7 @@ static void try_umount(const char *mnt, bool check_mnt, int flags)
 
 	// we are only interest in some specific mounts
 	if (check_mnt && !should_umount(&path)) {
+		path_put(&path);
 		return;
 	}
 
@@ -578,7 +579,6 @@ static void try_umount(const char *mnt, bool check_mnt, int flags)
 #else
 	ksu_sys_umount(mnt, flags);
 #endif
-	path_put(&path);
 }
 
 int ksu_handle_setuid(struct cred *new, const struct cred *old)
